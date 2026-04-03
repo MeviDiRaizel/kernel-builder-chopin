@@ -195,6 +195,7 @@ jobs:
           arch: ${{ steps.generate-args.outputs.ARCH }}
         if: ${{ env.withKernelSU == 'true' }}
         run: |
+          # Clean up any existing KernelSU directories to prevent conflicts [cite: 9]
           if [ -d "./KernelSU" ]; then
             rm -rf "./KernelSU"
           fi
@@ -202,14 +203,22 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          # Changed to KernelSU-Next and using 'next' branch
+          # Pull the KernelSU-Next source using the official setup script [cite: 9, 10]
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
+          # Fix for "unknown type name 'syscall_fn_t'" error on 4.14 kernels [cite: 257, 258]
+          # This inserts the missing typedef at the top of the problematic header file [cite: 257]
+          sed -i '1i typedef void (*syscall_fn_t)(void);' drivers/kernelsu/hook/syscall_hook.h
+
+          # Add required kernel configurations for KernelSU [cite: 256]
           echo -e "CONFIG_KPROBES=y" >> arch/${{ env.arch }}/configs/${{ env.DEFCONFIG_NAME }}
           echo -e "CONFIG_HAVE_KPROBES=y" >> arch/${{ env.arch }}/configs/${{ env.DEFCONFIG_NAME }}
           echo -e "CONFIG_KPROBE_EVENTS=y" >> arch/${{ env.arch }}/configs/${{ env.DEFCONFIG_NAME }}
 
+          # Optional: Verify the config was written correctly
           cat arch/${{ env.arch }}/configs/${{ env.DEFCONFIG_NAME }}
+          
+        
       # - name: 开启lxc和docker配置
       #   working-directory: ${{ env.KERNEL_NAME }}
       #   env:
